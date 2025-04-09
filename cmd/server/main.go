@@ -13,11 +13,11 @@ import (
 func main() {
 	var config = config.LoadConfig()
 
-	fmt.Printf("Сервер запущен на: %s\n", config.Address)
+	fmt.Printf("Запуск сервера на: %s\n", config.Address)
 
 	storage, err := sqlite.New(config.StoragePath)
 	if err != nil {
-		fmt.Println("Ошибка инициализации БД")
+		fmt.Printf("Ошибка инициализации БД: %s\n", err)
 		os.Exit(1)
 	}
 
@@ -32,7 +32,7 @@ func main() {
 		WriteTimeout: config.HTTPServer.Timeout,
 		IdleTimeout:  config.HTTPServer.IdleTimeout,
 	}
-
+	fmt.Printf("Cервер запущен")
 	if err := server.ListenAndServe(); err != nil {
 		//TODO: Добавить логирование ERROR
 		fmt.Printf("Ошибка запуска сервера: %s", err)
