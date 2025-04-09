@@ -27,7 +27,7 @@ func getConfigPath() string {
 	return filepath.Join(rootDir, "config", "env.yaml")
 }
 
-func MustLoad() *Config {
+func LoadConfig() *Config {
 	var configPath string = getConfigPath()
 
 	//TODO: Добавить логирование ERROR.

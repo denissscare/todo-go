@@ -19,7 +19,7 @@ func startInfo(cfg *config.Config) {
 }
 
 func main() {
-	var config = config.MustLoad()
+	var config = config.LoadConfig()
 
 	router := chi.NewRouter()
 
