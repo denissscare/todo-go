@@ -72,3 +72,44 @@ func New(storagePath string) (*Storage, error) {
 
 	return &Storage{db: db}, nil
 }
+
+func (s *Storage) AddTodo(description string, tags []string) (int64, error) {
+	const op = "storage.sqlite.AddTodo"
+
+	statement, err := s.db.Prepare("INSERT INTO todo (description) VALUES (?)")
+	if err != nil {
+		return 0, fmt.Errorf("%s: Не удалось подготовить выражение: %w", op, err)
+	}
+
+	result, err := statement.Exec(description)
+	if err != nil {
+		return 0, fmt.Errorf("%s: Не удалось добавить todo %w", op, err)
+	}
+
+	lastTodoID, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("%s: Не удалось получить TODO ID: %w", op, err)
+	}
+
+	for _, tag := range tags {
+		secondStatement, err := s.db.Prepare("INSERT OR IGNORE INTO tags (name) VALUES (?)")
+		if err != nil {
+			return 0, fmt.Errorf("%s: Не подготовить выражение: %w", op, err)
+		}
+
+		_, err = secondStatement.Exec(tag)
+		if err != nil {
+			return 0, fmt.Errorf("%s: Не удалось добавить тэг: %w", op, err)
+		}
+
+		_, err = s.db.Exec(`
+		INSERT INTO todo_tags (todo_id, tag_id) 
+		VALUES (?, (SELECT id FROM tags WHERE name = ?))`,
+			lastTodoID, tag)
+
+		if err != nil {
+			return 0, fmt.Errorf("%s: Не удалось связать todo с тэгом:%w", op, err)
+		}
+	}
+	return lastTodoID, nil
+}
