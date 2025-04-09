@@ -18,12 +18,17 @@ type Todo struct {
 	Tags        []string
 }
 
+type Tag struct {
+	ID   int64
+	Name string
+}
+
 func New(storagePath string) (*Storage, error) {
-	const operationPath string = "storage.sqlite.New"
+	const op string = "storage.sqlite.New"
 
 	db, err := sql.Open("sqlite3", storagePath)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", operationPath, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	statement, err := db.Prepare(`
@@ -39,7 +44,7 @@ func New(storagePath string) (*Storage, error) {
 
 	_, err = statement.Exec()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", operationPath, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	secondStatement, err := db.Prepare(`
@@ -62,7 +67,7 @@ func New(storagePath string) (*Storage, error) {
 
 	_, err = secondStatement.Exec()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", operationPath, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return &Storage{db: db}, nil
