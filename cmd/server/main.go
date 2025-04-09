@@ -3,30 +3,27 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/denissscare/todo-go/internal/config"
+	sqlite "github.com/denissscare/todo-go/internal/storage"
 	"github.com/go-chi/chi/v5"
 )
-
-// TODO: Добавить логирование INFO
-func startInfo(cfg *config.Config) {
-	fmt.Printf("\nСервер запущен по адресу: %v\n", cfg.HTTPServer.Address)
-
-	fmt.Print("\nПараметры конфига:")
-	fmt.Printf("Storage path: %v\n", cfg.StoragePath)
-	fmt.Printf("Address: %v\n", cfg.HTTPServer.Address)
-	fmt.Printf("Timeout: %v\n\n\n", cfg.HTTPServer.Timeout)
-}
 
 func main() {
 	var config = config.LoadConfig()
 
-	router := chi.NewRouter()
+	fmt.Printf("Сервер запущен на: %s\n", config.Address)
 
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Print("INFO: GET /\n")
-		w.Write([]byte("Start page"))
-	})
+	storage, err := sqlite.New(config.StoragePath)
+	if err != nil {
+		fmt.Println("Ошибка инициализации БД")
+		os.Exit(1)
+	}
+
+	_ = storage
+
+	router := chi.NewRouter()
 
 	server := &http.Server{
 		Addr:         config.Address,
@@ -36,7 +33,6 @@ func main() {
 		IdleTimeout:  config.HTTPServer.IdleTimeout,
 	}
 
-	startInfo(config)
 	if err := server.ListenAndServe(); err != nil {
 		//TODO: Добавить логирование ERROR
 		fmt.Printf("Ошибка запуска сервера: %s", err)
