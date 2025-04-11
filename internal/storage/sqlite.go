@@ -3,6 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -22,6 +23,10 @@ type Todo struct {
 type Tag struct {
 	ID   int64
 	Name string
+}
+
+func (t Todo) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
 func New(storagePath string) (*Storage, error) {
@@ -120,7 +125,7 @@ func (s *Storage) GetAllTodo() ([]Todo, error) {
 	rows, err := s.db.Query(`
         SELECT todo.id, todo.description, todo.completed, group_concat(tags.name, ', ') 
         FROM todo
-        LEFT JOIN todo_tags ON todo_tags.id = todo_tags.todo_id
+        LEFT JOIN todo_tags ON todo.id  = todo_tags.todo_id
         LEFT JOIN tags ON todo_tags.tag_id = tags.id
         GROUP BY todo.id
         ORDER BY todo.id
