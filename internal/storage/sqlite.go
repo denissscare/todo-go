@@ -25,94 +25,93 @@ type Tag struct {
 }
 
 func New(storagePath string) (*Storage, error) {
-	const op string = "storage.sqlite.New"
+	const operationPath string = "storage.sqlite.New"
 
 	db, err := sql.Open("sqlite3", storagePath)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", operationPath, err)
 	}
 
-	statement, err := db.Prepare(`
-	CREATE TABLE IF NOT EXISTS todo(
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS todo(
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				description TEXT,
+				completed BOOLEAN DEFAULT FALSE
+		)
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to create todo table: %w", operationPath, err)
+	}
+
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS tags(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		description TEXT,
-		completed BOOLEAN DEFAULT FALSE
+		name TEXT UNIQUE
+	);
+	
+	CREATE TABLE IF NOT EXISTS todo_tags(
+		todo_id INTEGER,
+		tag_id INTEGER,
+		PRIMARY KEY (todo_id, tag_id),
+		FOREIGN KEY (todo_id) REFERENCES todo(id) ON DELETE CASCADE,
+		FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 	);
 	`)
 	if err != nil {
-		return nil, err
-	}
-
-	_, err = statement.Exec()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	secondStatement, err := db.Prepare(`
-		CREATE TABLE IF NOT EXISTS tags(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT UNIQUE
-		);
-
-		CREATE TABLE IF NOT EXISTS todo_tags(
-			todo_id INTEGER,
-			tag_id INTEGER,
-			PRIMARY KEY (todo_id, tag_id),
-			FOREIGN KEY (todo_id) REFERENCES todo(id) ON DELETE CASCADE,
-			FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
-		);
-	`)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = secondStatement.Exec()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: failed to create tags tables: %w", operationPath, err)
 	}
 
 	return &Storage{db: db}, nil
 }
 
 func (s *Storage) AddTodo(description string, tags []string) (int64, error) {
-	const op = "storage.sqlite.AddTodo"
+	const op = "storage.AddTodo"
 
-	statement, err := s.db.Prepare("INSERT INTO todo (description) VALUES (?)")
+	tx, err := s.db.Begin()
 	if err != nil {
-		return 0, fmt.Errorf("%s: Не удалось подготовить выражение: %w", op, err)
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(
+		"INSERT INTO todo (description, completed) VALUES (?, ?)",
+		description,
+		false,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to insert todo: %w", op, err)
 	}
 
-	result, err := statement.Exec(description)
+	todoID, err := res.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("%s: Не удалось добавить todo %w", op, err)
+		return 0, fmt.Errorf("%s: failed to get last insert id: %w", op, err)
 	}
 
-	lastTodoID, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("%s: Не удалось получить TODO ID: %w", op, err)
-	}
-
-	for _, tag := range tags {
-		secondStatement, err := s.db.Prepare("INSERT OR IGNORE INTO tags (name) VALUES (?)")
+	for _, tagName := range tags {
+		_, err := tx.Exec(
+			"INSERT OR IGNORE INTO tags (name) VALUES (?)",
+			tagName,
+		)
 		if err != nil {
-			return 0, fmt.Errorf("%s: Не подготовить выражение: %w", op, err)
+			return 0, fmt.Errorf("%s: failed to insert tag: %w", op, err)
 		}
 
-		_, err = secondStatement.Exec(tag)
+		_, err = tx.Exec(
+			`INSERT INTO todo_tags (todo_id, tag_id)
+             VALUES (?, (SELECT id FROM tags WHERE name = ?))`,
+			todoID,
+			tagName,
+		)
 		if err != nil {
-			return 0, fmt.Errorf("%s: Не удалось добавить тэг: %w", op, err)
-		}
-
-		_, err = s.db.Exec(`
-		INSERT INTO todo_tags (todo_id, tag_id) 
-		VALUES (?, (SELECT id FROM tags WHERE name = ?))`,
-			lastTodoID, tag)
-
-		if err != nil {
-			return 0, fmt.Errorf("%s: Не удалось связать todo с тэгом:%w", op, err)
+			return 0, fmt.Errorf("%s: failed to link tag to todo: %w", op, err)
 		}
 	}
-	return lastTodoID, nil
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("%s: failed to commit transaction: %w", op, err)
+	}
+
+	return int64(todoID), nil
 }
 
 func (s *Storage) GetAllTodo() ([]Todo, error) {
