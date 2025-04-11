@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/denissscare/todo-go/internal/config"
+	gettodos "github.com/denissscare/todo-go/internal/handlers/getTodos"
 	savetodo "github.com/denissscare/todo-go/internal/handlers/saveTodo"
 	sqlite "github.com/denissscare/todo-go/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -27,6 +28,7 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Post("/add-todo", savetodo.New(storage))
+	router.Get("/all-todos", gettodos.New(storage))
 
 	server := &http.Server{
 		Addr:         config.Address,
