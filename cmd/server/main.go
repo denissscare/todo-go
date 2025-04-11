@@ -40,7 +40,7 @@ func main() {
 
 	router := chi.NewRouter()
 
-	router.Post("/add-todo", savetodo.New(storage))
+	router.Post("/add-todo", savetodo.New(logger, storage))
 	router.Get("/all-todos", gettodos.New(storage))
 
 	server := &http.Server{

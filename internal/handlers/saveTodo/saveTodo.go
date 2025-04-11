@@ -1,9 +1,10 @@
 package savetodo
 
 import (
-	"fmt"
+	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 )
 
@@ -26,24 +27,31 @@ type TodoSaver interface {
 	AddTodo(description string, tags []string) (int64, error)
 }
 
-func New(todoSaver TodoSaver) http.HandlerFunc {
+func New(log *slog.Logger, todoSaver TodoSaver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.saveTodo.New"
-		_ = op
+		log = log.With(
+			slog.String("op", op),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
+		)
 
 		var req Request
 		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
+			log.Error("Failed to decode request body", slog.String("error", err.Error()))
 			render.JSON(w, r, Message{Status: "Error", Error: "Ошибка чтения запроса"})
 			return
 		}
 
+		log.Info("request body decoded", slog.Any("request", req))
+
 		id, err := todoSaver.AddTodo(req.Description, req.Tags)
 		if err != nil {
-			er := fmt.Sprintf("%v", err)
-			render.JSON(w, r, Message{Status: "Error", Error: er})
+			log.Error("Error adding to the database", slog.String("error", err.Error()))
+			render.JSON(w, r, Message{Status: "Error", Error: err.Error()})
 			return
 		}
+		log.Info("Success adding to the database", slog.Int64("id", id))
 		render.JSON(w, r, Response{Message: Message{Status: "OK"}, Id: id})
 	}
 }
