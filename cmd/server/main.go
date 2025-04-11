@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,11 +24,15 @@ func main() {
 
 	_ = logger
 
-	fmt.Printf("Запуск сервера на: %s\n", config.Address)
+	logger.Info("Starting server", slog.String("env", config.Env))
+	logger.Debug("Debug messages enabled")
 
 	storage, err := sqlite.New(config.StoragePath)
 	if err != nil {
-		fmt.Printf("Ошибка инициализации БД: %s\n", err)
+		slog.Error("Failed to initialize storage",
+			slog.String("error", err.Error()),
+			slog.String("operation", "storage initialization"),
+		)
 		os.Exit(1)
 	}
 
@@ -47,14 +50,12 @@ func main() {
 		WriteTimeout: config.HTTPServer.Timeout,
 		IdleTimeout:  config.HTTPServer.IdleTimeout,
 	}
-	fmt.Printf("Cервер запущен")
+	logger.Info("Server start", slog.String("address", config.Address))
 	if err := server.ListenAndServe(); err != nil {
-		//TODO: Добавить логирование ERROR
-		fmt.Printf("Ошибка запуска сервера: %s", err)
+		logger.Error("failed to start server", slog.String("error", err.Error()))
 	}
 
-	//TODO: Добавить логирование INFO
-	fmt.Print("Сервер остановлен")
+	logger.Error("Server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
