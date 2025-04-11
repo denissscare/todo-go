@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -12,8 +13,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+const (
+	envLocal = "local"
+	envDev   = "dev"
+	envProd  = "prod"
+)
+
 func main() {
 	var config = config.LoadConfig()
+	var logger = setupLogger(config.Env)
+
+	_ = logger
 
 	fmt.Printf("Запуск сервера на: %s\n", config.Address)
 
@@ -45,4 +55,18 @@ func main() {
 
 	//TODO: Добавить логирование INFO
 	fmt.Print("Сервер остановлен")
+}
+
+func setupLogger(env string) *slog.Logger {
+	var logger *slog.Logger
+
+	switch env {
+	case envLocal:
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case envDev:
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case envProd:
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	}
+	return logger
 }
